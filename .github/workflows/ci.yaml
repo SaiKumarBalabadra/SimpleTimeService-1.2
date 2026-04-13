@@ -1,0 +1,179 @@
+# .github/workflows/ci.yml
+#
+# CI/CD pipeline for SimpleTimeService.
+#
+# Triggers:
+#   • push to main (paths: app/**)  → build, test, push image, update k8s manifest
+#   • pull_request to main          → build and test only (no push)
+#
+# Required GitHub Secrets:
+#   DOCKERHUB_USERNAME  — your DockerHub username
+#   DOCKERHUB_TOKEN     — DockerHub access token (Settings → Security → New Access Token)
+#
+# The pipeline:
+#   1. Lints the Dockerfile with hadolint
+#   2. Builds the image
+#   3. Runs a smoke test (hits / and /healthz)
+#   4. Scans the image for vulnerabilities with Trivy (fails on CRITICAL)
+#   5. Pushes both :latest and :<git-sha> tags to DockerHub
+#   6. Updates the image tag in microservice.yml and opens a commit on main
+
+name: CI — build, test, and publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+
+env:
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/simpletimeservice
+
+jobs:
+  # ── Build, test, scan ───────────────────────────────────────────────────────
+  build-and-test:
+    name: Build · test · scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: app/Dockerfile
+          # DL3008: apt-get pin versions — acceptable in a FROM python:slim base
+          ignore: DL3008
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (local, not pushed)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app
+          load: true                 # make available to docker run below
+          tags: ${{ env.IMAGE_NAME }}:test
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+      - name: Smoke test — start container and hit endpoints
+        run: |
+          docker run -d \
+            --name sts_test \
+            -p 8080:8080 \
+            --read-only \
+            --tmpfs /tmp \
+            ${{ env.IMAGE_NAME }}:test
+
+          echo "Waiting for container to be ready..."
+          for i in $(seq 1 10); do
+            if curl -sf http://localhost:8080/healthz; then
+              break
+            fi
+            sleep 2
+          done
+
+          echo "--- Testing / ---"
+          RESPONSE=$(curl -sf http://localhost:8080/)
+          echo "$RESPONSE"
+
+          # Assert both expected keys exist in the JSON response.
+          echo "$RESPONSE" | jq -e '.timestamp' > /dev/null
+          echo "$RESPONSE" | jq -e '.ip'        > /dev/null
+
+          echo "--- Testing /healthz ---"
+          curl -sf http://localhost:8080/healthz | jq -e '.status == "ok"' > /dev/null
+
+          echo "--- Verify non-root user ---"
+          docker exec sts_test id | grep -v "uid=0(root)"
+
+          docker stop sts_test
+
+      - name: Scan for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:test
+          format: table
+          exit-code: "1"             # fail the pipeline on CRITICAL findings
+          severity: CRITICAL
+          ignore-unfixed: true
+
+  # ── Push to DockerHub (main branch only) ────────────────────────────────────
+  push:
+    name: Push image
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    environment: production
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract image metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,format=short   # e.g. a1b2c3d
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app
+          push: true
+          tags:   ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+  # ── Update k8s manifest with the new image SHA ──────────────────────────────
+  update-manifest:
+    name: Update manifest
+    runs-on: ubuntu-latest
+    needs: push
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pin new image SHA in microservice.yml
+        env:
+          NEW_TAG: ${{ needs.push.outputs.image_tag }}
+        run: |
+          sed -i "s|image: .*simpletimeservice:.*|image: ${{ env.IMAGE_NAME }}:${NEW_TAG}|g" \
+            app/microservice.yml
+          echo "Updated image tag to ${NEW_TAG}"
+
+      - name: Commit and push updated manifest
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/microservice.yml
+          git diff --cached --quiet || git commit -m "ci: update simpletimeservice image to ${{ needs.push.outputs.image_tag }} [skip ci]"
+          git push

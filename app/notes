@@ -1,0 +1,42 @@
+Prerequisites tools
+Docker
+Terraform
+AWS CLI
+kubectl
+
+
+docker build -t isaikumarbalabadra/simpletimeservice:v1.0 .
+docker run -d -p 81:8080 --name sts isaikumarbalabadra/simpletimeservice:v1.0
+
+docker push isaikumarbalabadra/simpletimeservice:v1.0
+
+user login to their own aws
+
+aws configure
+
+cd terraform
+terraform init
+terraform apply
+
+# Step 1: Generate and save the plan
+terraform plan -out=tfplan
+
+# Step 2: Apply the saved plan
+terraform apply "tfplan"
+
+terraform init
+terraform plan
+terraform apply
+
+
+aws eks update-kubeconfig --region ap-south-1 --name devops-challenge
+
+aws eks list-access-entries --cluster-name devops-challenge
+
+kubectl cluster-info
+
+kubectl apply -f microservice.yml
+
+kubectl port-forward svc/simpletimeservice 8080:80
+curl localhost:8080
+

@@ -1,0 +1,284 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SimpleTimeService — Kubernetes manifests
+#
+# Includes:
+#   • Deployment with production resource limits, health probes, and a
+#     Fluent Bit log-shipping sidecar
+#   • ClusterIP Service (no LoadBalancer, per spec)
+#   • HorizontalPodAutoscaler — scales 2 → 6 replicas on CPU
+#   • PodDisruptionBudget    — guarantees ≥ 1 pod during node drains
+#
+# Prerequisites: metrics-server must be installed for HPA to work.
+#   kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+#
+# Deploy:
+#   kubectl apply -f microservice.yml
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── ConfigMap: Fluent Bit log-shipping configuration ─────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  labels:
+    app: simpletimeservice
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         5
+        Log_Level     warn
+        Daemon        off
+        Parsers_File  parsers.conf
+
+    [INPUT]
+        Name              tail
+        Path              /var/log/app/*.log
+        Parser            json
+        Tag               simpletimeservice.*
+        Refresh_Interval  5
+        Mem_Buf_Limit     5MB
+        Skip_Long_Lines   On
+
+    [FILTER]
+        Name   record_modifier
+        Match  simpletimeservice.*
+        Record service simpletimeservice
+        Record env     production
+
+    [OUTPUT]
+        Name   stdout
+        Match  *
+        Format json_lines
+
+  parsers.conf: |
+    [PARSER]
+        Name        json
+        Format      json
+        Time_Key    timestamp
+        Time_Format %Y-%m-%dT%H:%M:%SZ
+
+---
+# ── Deployment ────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simpletimeservice
+  labels:
+    app: simpletimeservice
+    version: "1.0"
+spec:
+  # HPA will manage replica count; this is the initial/minimum.
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: simpletimeservice
+
+  # Zero-downtime rolling update — never go below 1 available pod.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  template:
+    metadata:
+      labels:
+        app: simpletimeservice
+        version: "1.0"
+      annotations:
+        # Tell Prometheus to scrape the /metrics endpoint if you add one later.
+        prometheus.io/scrape: "false"
+        prometheus.io/port: "8080"
+
+    spec:
+      # ── Security hardening ────────────────────────────────────────────────
+      securityContext:
+        runAsNonRoot: true
+        runAsUser:  1000
+        runAsGroup: 1000
+        fsGroup:    1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Spread pods across nodes to survive a single-node failure.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: simpletimeservice
+
+      # Shared volume for log files passed from app → Fluent Bit sidecar.
+      volumes:
+        - name: app-logs
+          emptyDir: {}
+        - name: fluent-bit-config
+          configMap:
+            name: fluent-bit-config
+
+      # Grace period long enough for in-flight requests to complete.
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        # ── Main application container ──────────────────────────────────────
+        - name: simpletimeservice
+          # Replace with your DockerHub image, e.g. yourdockerhubuser/simpletimeservice:latest
+          image: yourdockerhubuser/simpletimeservice:latest
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
+          env:
+            - name: LOG_DIR
+              value: /var/log/app
+
+          # ── Resource limits ───────────────────────────────────────────────
+          resources:
+            requests:
+              cpu:    "100m"
+              memory: "64Mi"
+            limits:
+              cpu:    "250m"
+              memory: "128Mi"
+
+          # ── Health probes ─────────────────────────────────────────────────
+          # Startup probe: give the app up to 30 s to start before liveness kicks in.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            failureThreshold: 6
+            periodSeconds: 5
+
+          # Liveness probe: restart the container if /healthz stops responding.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            failureThreshold: 3
+            timeoutSeconds: 2
+
+          # Readiness probe: stop sending traffic until the app is truly ready.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 2
+
+          # ── Security context ──────────────────────────────────────────────
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem:   true
+            capabilities:
+              drop: ["ALL"]
+
+          volumeMounts:
+            - name: app-logs
+              mountPath: /var/log/app
+
+        # ── Sidecar: Fluent Bit log shipper ────────────────────────────────
+        - name: fluent-bit
+          image: fluent/fluent-bit:3.1
+          imagePullPolicy: IfNotPresent
+
+          resources:
+            requests:
+              cpu:    "25m"
+              memory: "32Mi"
+            limits:
+              cpu:    "50m"
+              memory: "64Mi"
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem:   true
+            runAsNonRoot:             true
+            runAsUser:                1000
+            capabilities:
+              drop: ["ALL"]
+
+          volumeMounts:
+            - name: app-logs
+              mountPath: /var/log/app
+              readOnly: true
+            - name: fluent-bit-config
+              mountPath: /fluent-bit/etc
+              readOnly: true
+
+---
+# ── Service (ClusterIP — no LoadBalancer, per spec) ───────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: simpletimeservice
+  labels:
+    app: simpletimeservice
+spec:
+  type: ClusterIP
+  selector:
+    app: simpletimeservice
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: http
+
+---
+# ── HorizontalPodAutoscaler ───────────────────────────────────────────────────
+# Requires metrics-server. Scales between 2 and 6 pods, targeting 60% CPU.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: simpletimeservice
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: simpletimeservice
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+  behavior:
+    scaleDown:
+      # Wait 2 minutes before scaling down to avoid flapping.
+      stabilizationWindowSeconds: 120
+      policies:
+        - type:          Pods
+          value:         1
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type:          Pods
+          value:         2
+          periodSeconds: 30
+
+---
+# ── PodDisruptionBudget ───────────────────────────────────────────────────────
+# Ensures at least 1 pod remains available during voluntary disruptions
+# (node drains, cluster upgrades, rolling deploys).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: simpletimeservice
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: simpletimeservice
