@@ -125,7 +125,7 @@ spec:
         # ── Main application container ──────────────────────────────────────
         - name: simpletimeservice
           # Replace with your DockerHub image, e.g. yourdockerhubuser/simpletimeservice:latest
-          image: yourdockerhubuser/simpletimeservice:latest
+          image: isaikumarbalabadra/simpletimeservice:latest
           imagePullPolicy: Always
 
           ports:
