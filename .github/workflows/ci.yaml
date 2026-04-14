@@ -163,8 +163,6 @@ jobs:
 
       - name: Pin new image SHA in microservice.yml
         env:
-          # NEW_TAG: ${{ needs.push.outputs.image_tag }}
-          # Create a 7-character short SHA
           FULL_SHA: ${{ github.sha }}
         run: |
           SHORT_SHA=$(echo $FULL_SHA | cut -c1-7)
