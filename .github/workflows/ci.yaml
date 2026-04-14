@@ -15,7 +15,7 @@
 #   2. Builds the image
 #   3. Runs a smoke test (hits / and /healthz)
 #   4. Scans the image for vulnerabilities with Trivy (fails on CRITICAL)
-#   5. Pushes both :latest and :<git-sha> tags to DockerHub
+#   5. Pushes <git-sha> tags to DockerHub
 #   6. Updates the image tag in microservice.yml and opens a commit on main
 
 name: CI — build, test, and publish
