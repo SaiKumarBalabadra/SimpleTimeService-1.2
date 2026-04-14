@@ -165,8 +165,9 @@ jobs:
         env:
           # NEW_TAG: ${{ needs.push.outputs.image_tag }}
           # Create a 7-character short SHA
-          SHORT_SHA=${{echo ${FULL_SHA} | cut -c1-7}}
+          FULL_SHA: ${{ github.sha }}
         run: |
+          SHORT_SHA=$(echo $FULL_SHA | cut -c1-7)
           sed -i "s|image: .*simpletimeservice:.*|image: ${{ env.IMAGE_NAME }}:${SHORT_SHA}|g" \
             app/microservice.yml
           echo "Updated image tag to ${NEW_TAG}"
