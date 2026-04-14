@@ -18,7 +18,7 @@ The goal is to showcase infrastructure-as-code, container best practices, and au
 
 ```
 .
-├── app/              # Application source code and Dockerfile
+├── app/              # Application source code and Dockerfile and k8s manifest file
 ├── terraform/        # Terraform configuration for AWS infrastructure
 └── README.md
 ```
