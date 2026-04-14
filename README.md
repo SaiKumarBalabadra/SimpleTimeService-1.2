@@ -1,6 +1,6 @@
-# 🚀 DevOps Challenge – SimpleTimeService
+# DevOps Challenge – SimpleTimeService
 
-## 📌 Overview
+## Overview
 
 This project demonstrates a complete end-to-end DevOps workflow:
 
@@ -14,7 +14,7 @@ The goal is to showcase infrastructure-as-code, container best practices, and au
 
 ---
 
-## 🧱 Project Structure
+## Project Structure
 
 .
 ├── app/              # Application source code and Dockerfile
@@ -25,7 +25,7 @@ The goal is to showcase infrastructure-as-code, container best practices, and au
 
 ---
 
-## ⚙️ Prerequisites
+## Prerequisites
 
 Ensure the following tools are installed:
 
@@ -37,7 +37,7 @@ Ensure the following tools are installed:
 
 ---
 
-## 🔐 AWS Authentication
+## AWS Authentication
 
 Configure AWS credentials:
 
@@ -50,7 +50,7 @@ Provide:
 
 ---
 
-## 🐳 Build and Push Docker Image (Manual - Optional)
+## Build and Push Docker Image (Manual - Optional)
 
 Note: This step is automated via CI/CD. Manual execution is optional.
 
@@ -60,7 +60,7 @@ docker push <your-dockerhub-username>/simpletimeservice:v1.1
 
 ---
 
-## ☁️ Deploy Infrastructure (Terraform)
+## Deploy Infrastructure (Terraform)
 
 cd terraform
 terraform init
@@ -74,14 +74,14 @@ This provisions:
 
 ---
 
-## 🔗 Connect to EKS Cluster
+## Connect to EKS Cluster
 
 aws eks update-kubeconfig --region ap-south-1 --name sts-app
 kubectl get nodes
 
 ---
 
-## 🚀 Deploy Application to Kubernetes
+## Deploy Application to Kubernetes
 
 cd ../k8s
 kubectl apply -f microservice.yml
@@ -93,7 +93,7 @@ kubectl get svc
 
 ---
 
-## 🌐 Access the Application
+## Access the Application
 
 kubectl port-forward svc/simpletimeservice 8080:80
 
@@ -109,9 +109,9 @@ Expected response:
 
 ---
 
-## ⚙️ CI/CD Pipeline (GitHub Actions)
+## CI/CD Pipeline (GitHub Actions)
 
-### 🔑 Required Secrets
+### Required Secrets
 
 Configure in GitHub → Settings → Secrets:
 
@@ -120,7 +120,7 @@ Configure in GitHub → Settings → Secrets:
 
 ---
 
-## 🚦 Pipeline Triggers
+## Pipeline Triggers
 
 - Push to main
   - Builds, tests, scans, pushes image
@@ -131,7 +131,7 @@ Configure in GitHub → Settings → Secrets:
 
 ---
 
-## 🔄 Pipeline Stages
+## Pipeline Stages
 
 1. Lint
    - Dockerfile linting using Hadolint
@@ -161,7 +161,7 @@ Configure in GitHub → Settings → Secrets:
 
 ---
 
-## 🔁 Deployment Flow
+## Deployment Flow
 
 Code Push → GitHub Actions →
 Build → Test → Scan → Push →
@@ -169,7 +169,7 @@ Update Manifest → Deploy via kubectl
 
 ---
 
-## 🛡️ Production Best Practices Implemented
+## Production Best Practices Implemented
 
 - Non-root container execution
 - Read-only filesystem
@@ -181,7 +181,7 @@ Update Manifest → Deploy via kubectl
 
 ---
 
-## 🧠 Design Decisions
+## Design Decisions
 
 - FastAPI (Python) → lightweight & fast development
 - Docker slim image → reduced attack surface
@@ -192,7 +192,7 @@ Update Manifest → Deploy via kubectl
 
 ---
 
-## ⚠️ Notes
+## Notes
 
 - No secrets are stored in the repository
 - Docker image must be public for Kubernetes to pull
@@ -200,7 +200,7 @@ Update Manifest → Deploy via kubectl
 
 ---
 
-## 🌟 Possible Improvements
+## Possible Improvements
 
 - Helm-based deployment
 - GitOps (ArgoCD / FluxCD)
@@ -209,14 +209,14 @@ Update Manifest → Deploy via kubectl
 
 ---
 
-## 👨‍💻 Author
+## Author
 
 Sai Kumar  
 DevOps Engineer | AWS | Kubernetes | Terraform
 
 ---
 
-## ✅ Summary
+## Summary
 
 This project demonstrates a production-aligned DevOps workflow:
 
