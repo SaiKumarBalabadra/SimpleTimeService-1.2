@@ -16,14 +16,12 @@ The goal is to showcase infrastructure-as-code, container best practices, and au
 
 ## Project Structure
 
+```
 .
 ├── app/              # Application source code and Dockerfile
 ├── terraform/        # Terraform configuration for AWS infrastructure
-├── k8s/              # Kubernetes manifests
-├── .github/workflows # CI/CD pipeline
 └── README.md
-
----
+```
 
 ## Prerequisites
 
