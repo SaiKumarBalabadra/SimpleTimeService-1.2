@@ -137,7 +137,6 @@ jobs:
           images: ${{ env.IMAGE_NAME }}
           tags: |
             type=sha,prefix=,format=short   # e.g. a1b2c3d
-            type=raw,value=latest
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -164,9 +163,11 @@ jobs:
 
       - name: Pin new image SHA in microservice.yml
         env:
-          NEW_TAG: ${{ needs.push.outputs.image_tag }}
+          # NEW_TAG: ${{ needs.push.outputs.image_tag }}
+          # Create a 7-character short SHA
+          SHORT_SHA=${{echo ${FULL_SHA} | cut -c1-7}}
         run: |
-          sed -i "s|image: .*simpletimeservice:.*|image: ${{ env.IMAGE_NAME }}:${NEW_TAG}|g" \
+          sed -i "s|image: .*simpletimeservice:.*|image: ${{ env.IMAGE_NAME }}:${SHORT_SHA}|g" \
             app/microservice.yml
           echo "Updated image tag to ${NEW_TAG}"
 
