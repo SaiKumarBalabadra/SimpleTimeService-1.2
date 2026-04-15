@@ -2,10 +2,10 @@
 # before running terraform init with this backend configured.
 terraform {
   backend "s3" {
-    bucket         = "particle41-tfstate"
+    bucket         = "particle41-tfstate-01"
     key            = "eks/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "particle41-tfstate-lock"
+    use_lockfile = "particle41-tfstate-lock"
     encrypt        = true
   }
 }
