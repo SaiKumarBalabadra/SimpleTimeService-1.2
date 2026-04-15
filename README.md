@@ -46,6 +46,10 @@ Provide:
 - AWS Secret Key
 - Region: ap-south-1
 
+prerequisites:
+
+Create an S3 Bucket named "particle41-tfstate" beforehand.
+
 ---
 
 ## Build and Push Docker Image (Manual - Optional)
