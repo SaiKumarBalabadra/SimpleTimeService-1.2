@@ -1,0 +1,9 @@
+{
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {
+      "ghcr.io/devcontainers/features/aws-cli:1": {},
+      "ghcr.io/devcontainers-extra/features/terraform-asdf:2": {},
+      "ghcr.io/devcontainers-extra/features/kubectl-asdf:2": {},
+      "ghcr.io/irfansofyana/devcontainer-features/lazydocker-binary-release:1": {}
+  }
+}
