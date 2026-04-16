@@ -48,7 +48,7 @@ Provide:
 
 prerequisites:
 
-Create an S3 Bucket named "particle41-tfstate-01" beforehand.
+Create an S3 Bucket named "Name of your choice" beforehand make changes in backend.tf file accordingly.
 
 ---
 
