@@ -38,9 +38,9 @@ Ensure the following tools are installed:
 ## AWS Authentication
 
 Configure AWS credentials:
-
+```
 aws configure
-
+```
 Provide:
 - AWS Access Key
 - AWS Secret Key
@@ -55,19 +55,30 @@ Create an S3 Bucket named "Name of your choice" beforehand make changes in backe
 ## Build and Push Docker Image (Manual - Optional)
 
 Note: This step is automated via CI/CD. Manual execution is optional.
-
+```
 cd app
+```
+```
 docker build -t <your-dockerhub-username>/simpletimeservice:v1.1 .
+```
+```
 docker push <your-dockerhub-username>/simpletimeservice:v1.1
-
+```
 ---
 
 ## Deploy Infrastructure (Terraform)
-
+```
 cd terraform
+```
+```
 terraform init
+```
+```
 terraform plan
+```
+```
 terraform apply
+```
 
 This provisions:
 - VPC with public & private subnets
@@ -78,21 +89,38 @@ This provisions:
 
 ## Connect to EKS Cluster
 
+```
 aws eks update-kubeconfig --region ap-south-1 --name sts-app
+```
+```
 kubectl get nodes
+```
 
+Install Metrics server manually which provide metrics to HPA
+```
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+```
+```
+kubectl get deployment metrics-server -n kube-system
+```
 ---
 
 ## Deploy Application to Kubernetes
 
+```
 cd ../k8s
+```
+```
 kubectl apply -f microservice.yml
-
+```
 Verify:
 
+```
 kubectl get pods
+```
+```
 kubectl get svc
-
+```
 ---
 
 ## Access the Application
@@ -104,11 +132,12 @@ http://localhost:8080
 
 Expected response:
 
+```
 {
   "timestamp": "2026-04-08T12:34:56.789Z",
   "ip": "127.0.0.1"
 }
-
+```
 ---
 
 ## CI/CD Pipeline (GitHub Actions)
@@ -117,9 +146,10 @@ Expected response:
 
 Configure in GitHub → Settings → Secrets:
 
+```
 - DOCKERHUB_USERNAME
 - DOCKERHUB_TOKEN
-
+```
 ---
 
 ## Pipeline Triggers
